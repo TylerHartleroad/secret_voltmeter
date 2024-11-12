@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -25,6 +26,9 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
+typedef StaticSemaphore_t osStaticMutexDef_t;
+typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -42,14 +46,82 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart2;
 
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for readTask */
+osThreadId_t readTaskHandle;
+uint32_t readTaskBuffer[ 128 ];
+osStaticThreadDef_t readTaskControlBlock;
+const osThreadAttr_t readTask_attributes = {
+  .name = "readTask",
+  .cb_mem = &readTaskControlBlock,
+  .cb_size = sizeof(readTaskControlBlock),
+  .stack_mem = &readTaskBuffer[0],
+  .stack_size = sizeof(readTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for writeTask */
+osThreadId_t writeTaskHandle;
+uint32_t writeTaskBuffer[ 128 ];
+osStaticThreadDef_t writeTaskControlBlock;
+const osThreadAttr_t writeTask_attributes = {
+  .name = "writeTask",
+  .cb_mem = &writeTaskControlBlock,
+  .cb_size = sizeof(writeTaskControlBlock),
+  .stack_mem = &writeTaskBuffer[0],
+  .stack_size = sizeof(writeTaskBuffer),
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for buffer1Mutex */
+osMutexId_t buffer1MutexHandle;
+osStaticMutexDef_t buffer1MutexControlBlock;
+const osMutexAttr_t buffer1Mutex_attributes = {
+  .name = "buffer1Mutex",
+  .cb_mem = &buffer1MutexControlBlock,
+  .cb_size = sizeof(buffer1MutexControlBlock),
+};
+/* Definitions for buffer2Mutex */
+osMutexId_t buffer2MutexHandle;
+osStaticMutexDef_t buffer2MutexControlBlock;
+const osMutexAttr_t buffer2Mutex_attributes = {
+  .name = "buffer2Mutex",
+  .cb_mem = &buffer2MutexControlBlock,
+  .cb_size = sizeof(buffer2MutexControlBlock),
+};
+/* Definitions for buffer1Semaphore */
+osSemaphoreId_t buffer1SemaphoreHandle;
+osStaticSemaphoreDef_t buffer1SemaphoreControlBlock;
+const osSemaphoreAttr_t buffer1Semaphore_attributes = {
+  .name = "buffer1Semaphore",
+  .cb_mem = &buffer1SemaphoreControlBlock,
+  .cb_size = sizeof(buffer1SemaphoreControlBlock),
+};
+/* Definitions for buffer2Semaphore */
+osSemaphoreId_t buffer2SemaphoreHandle;
+osStaticSemaphoreDef_t buffer2SemaphoreControlBlock;
+const osSemaphoreAttr_t buffer2Semaphore_attributes = {
+  .name = "buffer2Semaphore",
+  .cb_mem = &buffer2SemaphoreControlBlock,
+  .cb_size = sizeof(buffer2SemaphoreControlBlock),
+};
 /* USER CODE BEGIN PV */
-
+uint16_t buffer1[4];
+uint16_t buffer2[4];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+void StartDefaultTask(void *argument);
+void StartTaskRead(void *argument);
+void StartTaskWrite(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -92,6 +164,61 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();
+  /* Create the mutex(es) */
+  /* creation of buffer1Mutex */
+  buffer1MutexHandle = osMutexNew(&buffer1Mutex_attributes);
+
+  /* creation of buffer2Mutex */
+  buffer2MutexHandle = osMutexNew(&buffer2Mutex_attributes);
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of buffer1Semaphore */
+  buffer1SemaphoreHandle = osSemaphoreNew(1, 0, &buffer1Semaphore_attributes);
+
+  /* creation of buffer2Semaphore */
+  buffer2SemaphoreHandle = osSemaphoreNew(1, 0, &buffer2Semaphore_attributes);
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of readTask */
+  readTaskHandle = osThreadNew(StartTaskRead, NULL, &readTask_attributes);
+
+  /* creation of writeTask */
+  writeTaskHandle = osThreadNew(StartTaskWrite, NULL, &writeTask_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -232,6 +359,81 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTaskRead */
+/**
+* @brief Function implementing the readTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskRead */
+void StartTaskRead(void *argument)
+{
+  /* USER CODE BEGIN StartTaskRead */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTaskRead */
+}
+
+/* USER CODE BEGIN Header_StartTaskWrite */
+/**
+* @brief Function implementing the writeTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskWrite */
+void StartTaskWrite(void *argument)
+{
+  /* USER CODE BEGIN StartTaskWrite */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTaskWrite */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
