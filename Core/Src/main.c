@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,6 +44,10 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
+SPI_HandleTypeDef hspi1;
+
 UART_HandleTypeDef huart2;
 
 /* Definitions for defaultTask */
@@ -75,7 +79,7 @@ const osThreadAttr_t writeTask_attributes = {
   .cb_size = sizeof(writeTaskControlBlock),
   .stack_mem = &writeTaskBuffer[0],
   .stack_size = sizeof(writeTaskBuffer),
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for buffer1Mutex */
 osMutexId_t buffer1MutexHandle;
@@ -118,6 +122,8 @@ uint16_t buffer2[4];
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_ADC1_Init(void);
 void StartDefaultTask(void *argument);
 void StartTaskRead(void *argument);
 void StartTaskWrite(void *argument);
@@ -161,6 +167,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -292,6 +300,104 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 7;
+  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -343,7 +449,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD3_Pin */
   GPIO_InitStruct.Pin = LD3_Pin;
@@ -357,6 +473,32 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void encrypt (uint32_t v[2], const uint32_t k[4]) {
+  uint32_t v0=v[0], v1=v[1], sum=0, i;   /* set up */
+  uint32_t delta=0x9E3779B9;             /* a key schedule constant */
+  uint32_t k0=k[0], k1=k[1], k2=k[2], k3=k[3];  /* cache key */
+  for (i=0; i<32; i++) {                 /* basic cycle start */
+    sum += delta;
+    v0 += ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1);
+    v1 += ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3);
+  }                       /* end cycle */
+  v[0]=v0; v[1]=v1;
+}
+
+
+void decrypt (uint32_t v[2], const uint32_t k[4]) {
+  /* set up; "sum" was computed from the value of delta
+  in the "encrypt" function: sum = (delta << 5) & 0xFFFFFFFF */
+  uint32_t v0=v[0], v1=v[1], sum=0xC6EF3720, i;
+  uint32_t delta=0x9E3779B9;           /* a key schedule constant */
+  uint32_t k0=k[0], k1=k[1], k2=k[2], k3=k[3];  /* cache key */
+  for (i=0; i<32; i++) {             /* basic cycle start */
+    v1 -= ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3);
+    v0 -= ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1);
+    sum -= delta;
+  }                       /* end cycle */
+  v[0]=v0; v[1]=v1;
+}
 
 /* USER CODE END 4 */
 
@@ -388,10 +530,33 @@ void StartDefaultTask(void *argument)
 void StartTaskRead(void *argument)
 {
   /* USER CODE BEGIN StartTaskRead */
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  osSemaphoreAcquire(buffer1SemaphoreHandle, 100);
+	  osMutexAcquire(buffer1MutexHandle, 100); //Mutex 1 acquire
+
+	  for(uint8_t n = 0;n < 4;n++){
+		  HAL_ADC_Start(&hadc1);
+		  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+		  buffer1[n] = HAL_ADC_GetValue(&hadc1);
+	  }
+
+	  osMutexRelease(buffer1MutexHandle);
+	  osSemaphoreRelease(buffer1SemaphoreHandle);
+
+	  osSemaphoreAcquire(buffer2SemaphoreHandle, 100);
+	  osMutexAcquire(buffer2MutexHandle, 100); //Mutex 1 acquire
+
+	  for(uint8_t n = 0;n < 4;n++){
+		  HAL_ADC_Start(&hadc1);
+		  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+		  buffer2[n] = HAL_ADC_GetValue(&hadc1);
+	  }
+
+	  osMutexRelease(buffer2MutexHandle);
+	  osSemaphoreRelease(buffer2SemaphoreHandle);
   }
   /* USER CODE END StartTaskRead */
 }
@@ -406,10 +571,74 @@ void StartTaskRead(void *argument)
 void StartTaskWrite(void *argument)
 {
   /* USER CODE BEGIN StartTaskWrite */
+	uint32_t key[4] = {371, 215, 11, 12};
+	GPIOA->ODR |= 1<<6;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  uint32_t encrypt_vals[2];
+	  uint8_t spi_vals[8];
+
+	  // Buffer 1
+	  osSemaphoreAcquire(buffer1SemaphoreHandle, 100);
+	  osMutexAcquire(buffer1MutexHandle, 100);
+
+	  // Repackage as uint32
+	  encrypt_vals[0] = buffer1[1];
+	  encrypt_vals[0] = (encrypt_vals[0] << 16) | buffer1[0];
+	  encrypt_vals[1] = buffer1[3];
+	  encrypt_vals[1] = (encrypt_vals[0] << 16) | buffer1[2];
+
+	  encrypt(encrypt_vals, key);
+
+	  // Repackage as uint8
+	  spi_vals[0] = encrypt_vals[0];
+	  spi_vals[1] = encrypt_vals[0] >> 8;
+	  spi_vals[2] = encrypt_vals[0] >> 16;
+	  spi_vals[3] = encrypt_vals[0] >> 24;
+	  spi_vals[4] = encrypt_vals[1];
+	  spi_vals[5] = encrypt_vals[1] >> 8;
+	  spi_vals[6] = encrypt_vals[1] >> 16;
+	  spi_vals[7] = encrypt_vals[1] >> 24;
+
+	  // Send out on SPI
+	  GPIOA->ODR &= ~(1<<6);
+	  HAL_SPI_Transmit(&hspi1, (uint8_t*)spi_vals, 8, 100);
+	  GPIOA->ODR |= 1<<6;
+
+	  osMutexRelease(buffer1MutexHandle);
+	  osSemaphoreRelease(buffer1SemaphoreHandle);
+
+	  // Buffer 2
+	  osSemaphoreAcquire(buffer2SemaphoreHandle, 100);
+	  osMutexAcquire(buffer2MutexHandle, 100);
+
+	  // Repackage as uint32
+	  encrypt_vals[0] = buffer2[1];
+	  encrypt_vals[0] = (encrypt_vals[0] << 16) | buffer2[0];
+	  encrypt_vals[1] = buffer2[3];
+	  encrypt_vals[1] = (encrypt_vals[0] << 16) | buffer2[2];
+
+	  encrypt(encrypt_vals, key);
+
+	  // Repackage as uint8
+	  spi_vals[0] = encrypt_vals[0];
+	  spi_vals[1] = encrypt_vals[0] >> 8;
+	  spi_vals[2] = encrypt_vals[0] >> 16;
+	  spi_vals[3] = encrypt_vals[0] >> 24;
+	  spi_vals[4] = encrypt_vals[1];
+	  spi_vals[5] = encrypt_vals[1] >> 8;
+	  spi_vals[6] = encrypt_vals[1] >> 16;
+	  spi_vals[7] = encrypt_vals[1] >> 24;
+
+	  // Send out on SPI
+	  GPIOA->ODR &= ~(1<<6);
+	  HAL_SPI_Transmit(&hspi1, (uint8_t*)spi_vals, 8, 100);
+	  GPIOA->ODR |= 1<<6;
+
+	  osMutexRelease(buffer2MutexHandle);
+	  osSemaphoreRelease(buffer2SemaphoreHandle);
   }
   /* USER CODE END StartTaskWrite */
 }
